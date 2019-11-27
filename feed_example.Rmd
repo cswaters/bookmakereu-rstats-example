@@ -76,13 +76,15 @@ get_game(bkmkr_nest, futures) %>%
 
 ```
 
-## Super Bowl Odds
+## Stanley Cup Odds
 
 ```{r}
 get_game(bkmkr_nest, futures) %>% 
   get_futures_odds() %>% 
-  filter(prop == 'Odds to Win Super Bowl LIV') %>% 
-  distinct()
+  filter(prop == 'Odds to Win 2020 - Stanley Cup') %>% 
+  distinct() %>% 
+  select(-rot_num) %>% 
+  knitr::kable()
 ```
 
 
