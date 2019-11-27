@@ -1,0 +1,88 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Functions
+
+- `get_bookmaker_json` grab the bookmaker.eu XML feed, download it, convert it to json, then read the json file.
+- `nest_bookmaker_json` convert the list object created by reading the json file into a nested dataframe by the `Description` column
+- `get_league_desc` get a vector of the unique league/event descriptions. Filter by term, in the example by passing `FUTURES` returning only futures bet types.
+- `get_game` pass the nested dataframe and event descritions to unnest the game info.
+- `get_future_odds` extract and convert the nested list columns for bets in the future format.
+
+
+```{r functions}
+#library(tidyverse)
+
+get_bookmaker_json <- function(){
+  system('curl -sL "http://lines.bookmaker.eu" | xml2json > bkmkr.json')
+  jsonlite::fromJSON("bkmkr.json")
+}
+
+nest_bookmaker_json <- function(jsonfile){
+  jsonfile$Data$Leagues$league %>% 
+    as_tibble() %>% 
+    group_nest(Description)
+}
+
+get_league_desc <- function(df,word){
+  desc <- df$Description
+  mask <- grepl(x=bkmkr_nest$Description, 
+                pattern = word, 
+                ignore.case = TRUE)
+  desc[mask]
+}
+
+get_game <- function(df, desc) {
+  df %>%
+    filter(Description %in% desc) %>%
+    unnest(data) %>%
+    unnest(game)
+}
+
+get_futures_odds <- function(df){
+  df %>% 
+    unnest(line) %>% 
+    select(prop = htm,
+           rot_num = tmnum,
+           selection = tmname,
+           odds) %>%
+    mutate(odds = as.numeric(odds)
+    ) 
+}
+```
+
+## Example
+
+```{r}
+# download, convert, load, and nest bookmaker odds
+bkmkr_nest <- get_bookmaker_json() %>%
+  nest_bookmaker_json()
+
+# get all futures events
+futures <- get_league_desc(bkmkr_nest, 'FUTURES')
+
+# extract all events, count the number of items per future/prop
+get_game(bkmkr_nest, futures) %>% 
+  get_futures_odds() %>% 
+  count(prop,sort=TRUE) %>% 
+  head(15) %>% 
+  knitr::kable()
+
+```
+
+## Super Bowl Odds
+
+```{r}
+get_game(bkmkr_nest, futures) %>% 
+  get_futures_odds() %>% 
+  filter(prop == 'Odds to Win Super Bowl LIV') %>% 
+  distinct()
+```
+
+
